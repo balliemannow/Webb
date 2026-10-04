@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0e14">
+<title>Golden Factions</title>
+<style>
+:root{--bg:#0b0e14;--panel:#151a24;--line:#30394a;--text:#f5f7fb;--muted:#9ca7b9;--gold:#f4c542}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Avenir Next",sans-serif;touch-action:none}
+button{font:inherit;color:inherit}
+#app{height:100%;display:flex;flex-direction:column}
+.screen{flex:1;display:none;min-height:0}.screen.active{display:flex}
+#menu{align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 15%,#273148,#0b0e14 65%)}
+.card{width:min(680px,94vw);background:#151a24ee;border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 20px 70px #0008}
+h1{margin:0 0 4px;font-size:38px;letter-spacing:-1px}.sub{color:var(--muted);margin-bottom:20px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.btn{min-height:46px;border:1px solid #ffffff22;border-radius:12px;padding:10px 15px;background:#202737;font-weight:800}.btn.primary{background:var(--gold);color:#151515}.btn:active{transform:scale(.97)}
+#game{position:relative;background:#111722}
+canvas{width:100%;height:100%;display:block}
+#hud{position:absolute;inset:0;pointer-events:none;padding:calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 7px)}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.stat{font-size:12px;font-weight:900;text-shadow:0 2px 4px #000}.center{display:flex;flex-direction:column;align-items:center;gap:4px}.badge{background:#1118;border:1px solid #fff3;padding:6px 10px;border-radius:10px;font-size:11px;font-weight:900}
+.actions{position:absolute;right:8px;top:82px;display:flex;gap:6px;pointer-events:auto}.mini{width:42px;height:42px;border:1px solid #fff4;background:#111c;border-radius:10px;font-size:18px}.mini:disabled{opacity:.35}
+#bottom{position:absolute;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 6px);display:flex;justify-content:center;gap:6px;pointer-events:auto;flex-wrap:wrap}.buy{width:58px;height:48px;border:1px solid #fff4;background:#090c12e8;border-radius:10px;font-size:10px;font-weight:900}.buy small{display:block;color:#bdc6d6}
+#menuBtn{pointer-events:auto}.overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0009;padding:16px;pointer-events:auto}.overlay.show{display:flex}.modal{width:min(600px,94vw);max-height:90%;overflow:auto;background:#151a24;border:1px solid var(--line);border-radius:18px;padding:18px}
+.item{padding:12px;border:1px solid #ffffff12;border-radius:12px;background:#10151e;margin:8px 0}.item strong{display:block}.price{color:var(--gold);font-weight:900}.skinGrid,.levelGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.skin{padding:12px;border:1px solid #ffffff18;background:#10151e;border-radius:12px;text-align:left}.skin.selected{outline:2px solid var(--gold)}
+#toast{position:absolute;left:50%;top:18%;transform:translateX(-50%);background:#0b0e14dd;padding:10px 14px;border-radius:12px;font-weight:900;display:none;pointer-events:none}
+@media(max-width:430px){h1{font-size:31px}.card{padding:18px}.buy{width:54px}}
+</style>
+</head>
+<body>
+<div id="app">
+<section id="menu" class="screen active">
+ <div class="card">
+  <h1>GOLDEN FACTIONS</h1><div class="sub">A complete original stick-figure strategy game prototype.</div>
+  <div id="profile"></div>
+  <div class="row" style="margin-top:16px"><button class="btn primary" id="playBtn">Campaign</button><button class="btn" id="skinsBtn">Skins</button><button class="btn" id="upgradesBtn">Upgrades</button></div>
+  <div class="row" style="margin-top:10px"><button class="btn" id="resetBtn">Reset Progress</button></div>
+ </div>
+</section>
+<section id="game" class="screen">
+ <canvas id="canvas"></canvas>
+ <div id="hud">
+  <div class="top">
+   <div><div id="gold" class="stat"></div><div id="basehp" class="stat"></div></div>
+   <div class="center"><div id="level" class="badge"></div><div id="skin" class="badge"></div></div>
+   <div><div id="enemyhp" class="stat" style="text-align:right"></div><button id="menuBtn" class="mini">☰</button></div>
+  </div>
+  <div class="actions"><button id="ability1" class="mini">⚡</button><button id="ability2" class="mini">☄️</button></div>
+  <div id="bottom">
+   <button class="buy" data-k="miner">⛏ Miner<small>40</small></button>
+   <button class="buy" data-k="sword">⚔ Sword<small>80</small></button>
+   <button class="buy" data-k="archer">🏹 Archer<small>100</small></button>
+   <button class="buy" data-k="spear">🛡 Spear<small>140</small></button>
+   <button class="buy" data-k="giant">👹 Giant<small>350</small></button>
+  </div>
+  <div id="toast"></div>
+  <div id="gameOverlay" class="overlay"><div class="modal">
+   <h2 id="resultTitle">Paused</h2><p id="resultText"></p>
+   <div class="row"><button class="btn primary" id="resumeBtn">Resume</button><button class="btn" id="restartBtn">Restart</button><button class="btn" id="levelsBtn">Levels</button></div>
+  </div></div>
+ </div>
+</section>
+<section id="panel" class="screen">
+ <div class="card" style="margin:auto">
+  <h2 id="panelTitle"></h2><div id="panelContent"></div>
+  <button class="btn" id="backBtn" style="margin-top:14px">Back</button>
+ </div>
+</section>
+</div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const canvas=$("canvas"),ctx=canvas.getContext("2d");
+let W=0,H=0,D=1;
+function resize(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*D;canvas.height=H*D;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(D,0,0,D,0,0)} addEventListener("resize",resize);resize();
+
+const skins=[
+ {id:"golden",name:"Golden",icon:"✨",color:"#f4c542",hp:1,armor:.75,damage:1,atk:1,regen:0,fire:false,desc:"Heavy golden armor. Units take 25% less damage."},
+ {id:"lunar",name:"Lunar",icon:"🌙",color:"#8f8cff",hp:1,armor:1,damage:1,atk:1,regen:3,fire:false,desc:"Moonlight regeneration and improved archers."},
+ {id:"samurai",name:"Samurai",icon:"🗡️",color:"#e64b55",hp:1,armor:1,damage:1.18,atk:1.2,regen:0,fire:false,desc:"Fast attacks and deadly counter strikes."},
+ {id:"draconic",name:"Draconic",icon:"🐉",color:"#35d06f",hp:1.15,armor:1,damage:1.08,atk:1,regen:0,fire:true,desc:"Dragon-blooded units inflict burning damage."},
+ {id:"frost",name:"Frostborn",icon:"❄️",color:"#63d8ff",hp:1.08,armor:1,damage:.96,atk:1,regen:1,slow:true,fire:false,desc:"Durable ice warriors slow enemies."},
+ {id:"void",name:"Void",icon:"🕳️",color:"#b06cff",hp:1,armor:1,damage:1.2,atk:.92,regen:0,fire:false,crit:.18,desc:"Powerful attacks with a chance to critically strike."},
+ {id:"storm",name:"Storm",icon:"⚡",color:"#f0e85c",hp:1,armor:1,damage:1.04,atk:1.08,regen:0,chain:true,fire:false,desc:"Fast warriors with lightning chain attacks."},
+ {id:"verdant",name:"Verdant",icon:"🌿",color:"#55d98a",hp:1.1,armor:.92,damage:.98,atk:1,regen:2,fire:false,desc:"Regenerating guardians with resilient armor."}
+];
+const units={
+ miner:{cost:40,hp:70,dmg:6,range:28,cd:1.15,speed:44},
+ sword:{cost:80,hp:130,dmg:18,range:38,cd:.75,speed:34},
+ archer:{cost:100,hp:85,dmg:20,range:230,cd:1.5,speed:30},
+ spear:{cost:140,hp:230,dmg:28,range:45,cd:1.1,speed:25},
+ giant:{cost:350,hp:650,dmg:65,range:58,cd:1.7,speed:13}
+};
+const levels=[
+ {name:"Golden Fields",enemy:"Iron Raiders",hp:1400,rate:4.4,boost:1},
+ {name:"Moonlit Pass",enemy:"Night Legion",hp:1800,rate:3.7,boost:1.12},
+ {name:"Crimson Gate",enemy:"Samurai Host",hp:2200,rate:3.2,boost:1.25},
+ {name:"Dragon Wastes",enemy:"Dragonkin",hp:2700,rate:2.8,boost:1.4},
+ {name:"Frost Citadel",enemy:"Frostborn",hp:3300,rate:2.5,boost:1.58},
+ {name:"Void Temple",enemy:"Void Guard",hp:4000,rate:2.25,boost:1.8}
+];
+let save=JSON.parse(localStorage.getItem("gf-save")||"null")||{level:0,coins:0,skin:"golden",unlocked:["golden","lunar","samurai","draconic"],up:{mine:0,damage:0,hp:0},wins:0};
+function persist(){localStorage.setItem("gf-save",JSON.stringify(save))}
+let state=null,last=performance.now(),raf=0,audio=null;
+
+function show(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));$(id).classList.add("active")}
+function profile(){ $("profile").innerHTML=`<b>Progress:</b> Level ${save.level+1}/${levels.length} · Wins ${save.wins} · 💰 ${save.coins}<br><span style="color:#9ca7b9">Upgrade your army, unlock skins, and conquer every level.</span>`}
+function openPanel(type){
+ show("panel");$("panelTitle").textContent=type==="skins"?"Custom Skins":"Army Upgrades";
+ if(type==="skins"){
+  $("panelContent").innerHTML=`<div class="skinGrid">${skins.map(s=>`<button class="skin ${save.skin===s.id?"selected":""}" data-skin="${s.id}" ${save.unlocked.includes(s.id)?"":"disabled"}><div style="font-size:25px">${s.icon}</div><b>${s.name}</b><div style="color:${s.color}">${s.desc}</div>${save.unlocked.includes(s.id)?"":"Locked"}</button>`).join("")}</div><p style="color:#9ca7b9">More skins change combat behavior, not just appearance.</p>`;
+  document.querySelectorAll("[data-skin]").forEach(b=>b.addEventListener("click",()=>{save.skin=b.dataset.skin;persist();openPanel("skins")}));
+ }else{
+  const costs={mine:100,damage:150,hp:125};
+  $("panelContent").innerHTML=[["mine","Mining","Increase passive gold and miner income."],["damage","Weapons","Increase all friendly damage."],["hp","Fortification","Increase statue maximum HP."]].map(([k,n,d])=>`<div class="item"><strong>${n} — Lv ${save.up[k]}</strong><span style="color:#9ca7b9">${d}</span><br><span class="price">💰 ${costs[k]+save.up[k]*75}</span> <button class="btn" data-up="${k}">Upgrade</button></div>`).join("");
+  document.querySelectorAll("[data-up]").forEach(b=>b.addEventListener("click",()=>{let k=b.dataset.up,c=costs[k]+save.up[k]*75;if(save.coins>=c){save.coins-=c;save.up[k]++;persist();openPanel("upgrades")}}));
+ }
+}
+$("skinsBtn").onclick=()=>openPanel("skins");$("upgradesBtn").onclick=()=>openPanel("upgrades");$("backBtn").onclick=()=>{profile();show("menu")};
+$("resetBtn").onclick=()=>{if(confirm("Reset all progress?")){localStorage.removeItem("gf-save");location.reload()}};
+
+class Unit{
+ constructor(kind,x,enemy=false){
+  this.kind=kind;this.s=units[kind];this.enemy=enemy;this.x=x;this.y=H*.36+Math.random()*Math.max(80,H*.34);this.max=this.s.hp*(enemy?1:skins.find(s=>s.id===save.skin).hp)*(1+save.up.hp*.08);this.hp=this.max;this.cd=0;this.burn=0;this.slow=0;this.id=Math.random()
+ }
+ update(dt){this.cd=Math.max(0,this.cd-dt);this.burn=Math.max(0,this.burn-dt);this.slow=Math.max(0,this.slow-dt);if(this.burn>0)this.hp-=4*dt;if(!this.enemy){let sk=skins.find(s=>s.id===save.skin);if(sk.regen)this.hp=Math.min(this.max,this.hp+sk.regen*dt)}}
+ draw(){let sk=skins.find(s=>s.id===save.skin),r=this.kind==="giant"?19:13,c=this.enemy?"#aab2c0":sk.color;ctx.save();ctx.translate(this.x,this.y);ctx.fillStyle=c;ctx.strokeStyle="#fff";ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle="#101218";ctx.font="bold 10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(this.kind[0].toUpperCase(),0,0);ctx.fillStyle="#20df71";ctx.fillRect(-18,-r-9,36*Math.max(0,this.hp/this.max),4);if(!this.enemy&&save.skin==="draconic"){ctx.fillStyle=sk.color;ctx.fillRect(-10,-r-4,5,8);ctx.fillRect(5,-r-4,5,8)}ctx.restore()}
+}
+function sound(freq=440,dur=.06){try{audio??=new (window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;g.gain.value=.035;o.connect(g);g.connect(audio.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.stop(audio.currentTime+dur)}catch{}}
+function toast(t){$("toast").textContent=t;$("toast").style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").style.display="none",1100)}
+function startLevel(i=save.level){let L=levels[i];state={level:i,gold:220+save.up.mine*35,playerHP:1500+save.up.hp*160,enemyHP:L.hp,units:[],enemies:[],spawn:1.5,paused:false,over:false,ability1:0,ability2:0};show("game");$("gameOverlay").classList.remove("show");updateHUD()}
+function nearest(arr,u){let b=null,d=1e9;for(let v of arr){let q=Math.hypot(v.x-u.x,v.y-u.y);if(q<d){d=q;b=v}}return b}
+function buy(k){if(!state||state.paused||state.over)return;let c=units[k].cost;if(state.gold<c)return toast("Not enough gold");state.gold-=c;state.units.push(new Unit(k,105,false));sound(280,.04)}
+function attack(a,t){let sk=skins.find(s=>s.id===save.skin),d=a.s.dmg*(a.enemy?1:sk.damage)*(1+save.up.damage*.07);if(!a.enemy&&sk.crit&&Math.random()<sk.crit)d*=2;if(!a.enemy&&sk.fire)t.burn=2.5;if(!a.enemy&&sk.slow)t.slow=2;if(!a.enemy&&sk.chain){d*=1.02;let n=nearest(state.enemies,t);if(n&&n!==t&&Math.hypot(n.x-t.x,n.y-t.y)<75)n.hp-=d*.28}t.hp-=d;a.cd=a.s.cd/(a.enemy?1:sk.atk)}
+function useAbility(n){if(!state||state.paused||state.over)return;let cd=n===1?"ability1":"ability2";if(state[cd]>0)return;let sk=skins.find(s=>s.id===save.skin);if(n===1){state.ability1=14;state.units.forEach(u=>u.hp=Math.min(u.max,u.hp+u.max*.22));toast("RALLY — ARMY HEALED");sound(520,.12)}else{state.ability2=18;let t=state.enemies.slice().sort((a,b)=>a.x-b.x).slice(0,4);t.forEach(e=>e.hp-=180*(1+save.up.damage*.1));toast(sk.id==="draconic"?"DRAGON STRIKE":"METEOR STRIKE");sound(120,.2)}}
+function step(dt){
+ if(!state||state.paused||state.over)return;
+ state.ability1=Math.max(0,state.ability1-dt);state.ability2=Math.max(0,state.ability2-dt);
+ let sk=skins.find(s=>s.id===save.skin),L=levels[state.level];
+ state.gold+=dt*(4+save.up.mine*1.5+state.units.filter(u=>u.kind==="miner").length*3);
+ state.spawn-=dt;if(state.spawn<=0){let pool=state.level<2?["sword","archer","spear"]:state.level<4?["sword","archer","spear","giant"]:["archer","spear","giant","giant"];let k=pool[Math.floor(Math.random()*pool.length)];let e=new Unit(k,W-105,true);e.max*=L.boost;e.hp=e.max;state.enemies.push(e);state.spawn=Math.max(1.2,L.rate-state.enemies.length*.025)}
+ [...state.units,...state.enemies].forEach(u=>u.update(dt));
+ for(let u of state.units){let t=nearest(state.enemies,u),d=t?Math.hypot(t.x-u.x,t.y-u.y):9999,spd=u.s.speed*(u.slow>0?.65:1)*(!u.enemy?sk.atk:1);if(t&&d<=u.s.range+18){if(u.cd<=0)attack(u,t)}else if(u.x<W-120)u.x+=spd*dt;else state.enemyHP-=u.s.dmg*.8*dt}
+ for(let e of state.enemies){let t=nearest(state.units,e),d=t?Math.hypot(t.x-e.x,t.y-e.y):9999;if(t&&d<=e.s.range+18){if(e.cd<=0)attack(e,t)}else if(e.x>120)e.x-=e.s.speed*(e.slow>0?.65:1)*dt;else state.playerHP-=e.s.dmg*.8*dt}
+ state.units=state.units.filter(u=>u.hp>0&&u.x<W+30);state.enemies=state.enemies.filter(e=>e.hp>0&&e.x>-30);
+ if(state.enemyHP<=0)finish(true);else if(state.playerHP<=0)finish(false);
+ updateHUD()
+}
+function finish(win){state.over=true;if(win){save.wins++;save.coins+=100+state.level*50;if(state.level<levels.length-1)save.level=Math.max(save.level,state.level+1);let unlock=skins[state.level+4]?.id;if(unlock&&!save.unlocked.includes(unlock))save.unlocked.push(unlock);persist();$("resultTitle").textContent="VICTORY!";$("resultText").textContent=`${levels[state.level].name} conquered. +${100+state.level*50} coins.`}else{$("resultTitle").textContent="DEFEAT";$("resultText").textContent="Your statue fell. Upgrade your army and try again."}$("resumeBtn").style.display="none";$("gameOverlay").classList.add("show");sound(win?780:110,.22)}
+function updateHUD(){if(!state)return;$("gold").textContent="💰 "+Math.floor(state.gold);$("basehp").textContent="BASE "+Math.max(0,Math.floor(state.playerHP));$("enemyhp").textContent="ENEMY "+Math.max(0,Math.floor(state.enemyHP));$("level").textContent=`LEVEL ${state.level+1} · ${levels[state.level].name}`;$("skin").textContent=skins.find(s=>s.id===save.skin).icon+" "+skins.find(s=>s.id===save.skin).name;$("ability1").disabled=state.ability1>0;$("ability2").disabled=state.ability2>0;$("ability1").textContent=state.ability1>0?"⚡"+Math.ceil(state.ability1):"⚡";$("ability2").textContent=state.ability2>0?"☄️"+Math.ceil(state.ability2):"☄️"}
+function draw(){
+ if(!state)return;ctx.clearRect(0,0,W,H);let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#182031");g.addColorStop(1,"#0e1219");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle="#5c432d";ctx.fillRect(0,H-78,W,78);ctx.fillStyle="#45bd59";ctx.fillRect(0,H-81,W,3);
+ ctx.fillStyle="#f4c542";ctx.fillRect(38,H*.42-62,54,124);ctx.fillStyle="#9ea7b4";ctx.fillRect(W-92,H*.42-62,54,124);
+ for(let i=0;i<12;i++){ctx.fillStyle="#ffffff08";ctx.fillRect((i*137+state.level*41)%W,95+(i%4)*80,2,2)}
+ state.units.forEach(u=>u.draw());state.enemies.forEach(u=>u.draw())
+}
+function frame(now){let dt=Math.min(.05,(now-last)/1000);last=now;step(dt);draw();raf=requestAnimationFrame(frame)}requestAnimationFrame(frame);
+
+document.querySelectorAll(".buy").forEach(b=>b.addEventListener("pointerdown",e=>{e.preventDefault();buy(b.dataset.k)}));
+$("ability1").onclick=()=>useAbility(1);$("ability2").onclick=()=>useAbility(2);
+$("menuBtn").onclick=()=>{state.paused=true;$("resultTitle").textContent="Paused";$("resultText").textContent="Choose an action."; $("resumeBtn").style.display="inline-block";$("gameOverlay").classList.add("show")};
+$("resumeBtn").onclick=()=>{state.paused=false;$("gameOverlay").classList.remove("show")};
+$("restartBtn").onclick=()=>startLevel(state.level);
+$("levelsBtn").onclick=()=>{state.paused=true;$("gameOverlay").classList.remove("show");show("panel");$("panelTitle").textContent="Campaign Levels";$("panelContent").innerHTML=`<div class="levelGrid">${levels.map((l,i)=>`<button class="item" data-level="${i}" ${i>save.level?"disabled":""}><strong>${i+1}. ${l.name}</strong><span style="color:#9ca7b9">${l.enemy}</span></button>`).join("")}</div>`;document.querySelectorAll("[data-level]").forEach(b=>b.onclick=()=>startLevel(+b.dataset.level))};
+$("playBtn").onclick=()=>startLevel(save.level);
+$("canvas").addEventListener("pointerdown",e=>{if(!state||state.paused||state.over)return;if(e.clientY>85&&e.clientY<H-80){state.units.slice(0,5).forEach(u=>u.x+=48);sound(360,.03)}});
+addEventListener("keydown",e=>{if(e.key==="1")buy("miner");if(e.key==="2")buy("sword");if(e.key==="3")buy("archer");if(e.key==="4")buy("spear");if(e.key==="5")buy("giant");if(e.key==="q")useAbility(1);if(e.key==="e")useAbility(2)});
+profile();
+</script>
+</body>
+</html>
